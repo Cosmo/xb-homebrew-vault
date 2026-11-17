@@ -474,6 +474,21 @@ public sealed class DesktopUiActions
                     return null;
                 }
             };
+            vm.AutoSaveFolder = SettingsService.Current.ScreenshotFolder;
+            vm.AutoSaveFolderChanged = folder =>
+            {
+                SettingsService.Current.ScreenshotFolder = folder;
+                SettingsService.Save();
+            };
+            vm.PickFolderDialog = async () =>
+            {
+                var folders = await _main.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Choose Screenshot Folder",
+                    AllowMultiple = false
+                });
+                return folders is { Count: > 0 } ? folders[0].TryGetLocalPath() : null;
+            };
             var win = new ScreenshotWindow { DataContext = vm };
             win.ShowDialog(_main);
         };

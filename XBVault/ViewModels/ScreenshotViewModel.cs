@@ -39,10 +39,41 @@ public partial class ScreenshotViewModel : ObservableObject, IDisposable
 
     public bool HasScreenshot => ScreenshotImage is not null;
 
+    public bool CanSaveAs => HasScreenshot && !IsLiveCapturing;
+
     partial void OnScreenshotImageChanged(Bitmap? value)
     {
         OnPropertyChanged(nameof(HasScreenshot));
+        OnPropertyChanged(nameof(CanSaveAs));
     }
+
+    /// <summary>
+    /// When set, every Capture is also written to this folder. Null = saving is manual (Save As).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasAutoSaveFolder))]
+    [NotifyPropertyChangedFor(nameof(AutoSaveLabel))]
+    private string? _autoSaveFolder;
+
+    public bool HasAutoSaveFolder => !string.IsNullOrEmpty(AutoSaveFolder);
+
+    public string AutoSaveLabel
+    {
+        get
+        {
+            if (!HasAutoSaveFolder) return "Auto-Save To...";
+            var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(AutoSaveFolder!));
+            return $"Auto-Save: {(name.Length > 0 ? name : AutoSaveFolder)}";
+        }
+    }
+
+    /// <summary>Shows a folder picker and returns the chosen path, or null when cancelled.</summary>
+    public Func<Task<string?>>? PickFolderDialog { get; set; }
+
+    /// <summary>Raised when the folder is set, changed or cleared, so the host can persist it.</summary>
+    public Action<string?>? AutoSaveFolderChanged { get; set; }
+
+    partial void OnAutoSaveFolderChanged(string? value) => AutoSaveFolderChanged?.Invoke(value);
 
     public enum StatusSeverity { None, Success, Error, Info }
 
@@ -106,6 +137,7 @@ public partial class ScreenshotViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LiveButtonText))]
     [NotifyPropertyChangedFor(nameof(Cursor))]
+    [NotifyPropertyChangedFor(nameof(CanSaveAs))]
     private bool _isLiveCapturing;
 
     public Cursor? Cursor => (IsCapturing || IsLiveCapturing) ? AppStartingCursor : null;
@@ -127,9 +159,52 @@ public partial class ScreenshotViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private async Task ChooseFolderAsync()
+    {
+        if (PickFolderDialog is null) return;
+
+        var folder = await PickFolderDialog();
+        if (!string.IsNullOrEmpty(folder))
+            AutoSaveFolder = folder;
+    }
+
+    [RelayCommand]
+    private void ClearFolder() => AutoSaveFolder = null;
+
+    // Milliseconds keep quick successive captures from colliding
+    internal static string BuildFileName(DateTime now) => $"xbox-{now:yyyy-MM-dd_HH-mm-ss-fff}.png";
+
+    internal async Task<string> WriteToFolderAsync(byte[] data)
+    {
+        Directory.CreateDirectory(AutoSaveFolder!);
+        var path = Path.Combine(AutoSaveFolder!, BuildFileName(DateTime.Now));
+        await File.WriteAllBytesAsync(path, data);
+        return path;
+    }
+
+    private async Task AutoSaveAsync(byte[] data)
+    {
+        try
+        {
+            var path = await WriteToFolderAsync(data);
+            StatusMessage = $"Saved {Path.GetFileName(path)}";
+            StatusType = StatusSeverity.Success;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not save screenshot: {ex.Message}";
+            StatusType = StatusSeverity.Error;
+            Logger.Error(ex, "Auto-save screenshot failed");
+        }
+    }
+
+    [RelayCommand]
     private async Task CaptureScreenshotAsync()
     {
-        if (IsLiveCapturing) return;
+        // During live: with an auto-save folder the frame is saved and live carries on;
+        // without one, live stops so the captured frame stays on screen for Save As.
+        if (IsLiveCapturing && !HasAutoSaveFolder)
+            _liveCts?.Cancel();
 
         IsCapturing = true;
         StatusMessage = null;
@@ -155,6 +230,9 @@ public partial class ScreenshotViewModel : ObservableObject, IDisposable
                 ScreenshotImage = bitmap;
                 return Task.CompletedTask;
             });
+
+            if (HasAutoSaveFolder)
+                await AutoSaveAsync(data);
         }
         catch (Exception ex)
         {

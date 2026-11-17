@@ -20,4 +20,5 @@ public class AppSettings
     public double MainWindowWidth { get; set; }
     public double MainWindowHeight { get; set; }
     public bool WizardCompleted { get; set; }
+    public string? ScreenshotFolder { get; set; }
 }

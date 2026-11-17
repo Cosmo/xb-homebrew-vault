@@ -63,13 +63,12 @@
 
           <!-- Buttons + Live capture row -->
           <Grid Grid.Row="1"
-                ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto"
+                ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto"
                 ColumnSpacing="6">
             <Button x:Name="CaptureBtn"
                     Grid.Column="0"
                     Command="{Binding CaptureScreenshotCommand}"
                     Classes="Accent"
-                    IsEnabled="{Binding IsLiveCapturing, Converter={StaticResource BoolInverse}}"
                     Padding="14,8" FontWeight="SemiBold">
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                 <Grid>
@@ -86,8 +85,7 @@
             <Button x:Name="SaveScreenshotBtn"
                     Grid.Column="1"
                     Command="{Binding SaveScreenshotCommand}"
-                    IsVisible="{Binding HasScreenshot}"
-                    IsEnabled="{Binding IsLiveCapturing, Converter={StaticResource BoolInverse}}"
+                    IsEnabled="{Binding CanSaveAs}"
                     Padding="12,7" FontWeight="SemiBold">
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
                 <Grid>
@@ -101,26 +99,47 @@
                 <TextBlock Grid.Column="1" Text="Save As..." VerticalAlignment="Center"/>
               </Grid>
             </Button>
-            <TextBlock Grid.Column="2"
+            <!-- Auto-save location: when set, every Capture is also written to that folder -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
+              <Button Command="{Binding ChooseFolderCommand}"
+                      ToolTip.Tip="{Binding AutoSaveFolder}"
+                      Padding="12,7" FontWeight="SemiBold">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="5">
+                  <Image Source="avares://XBVault/Assets/Views/FileExplorerView/fileexplorer-folder-20.png"
+                         Width="18" Height="18" Stretch="Uniform"/>
+                  <TextBlock Grid.Column="1" Text="{Binding AutoSaveLabel}"
+                             MaxWidth="220" TextTrimming="CharacterEllipsis"
+                             VerticalAlignment="Center"/>
+                </Grid>
+              </Button>
+              <Button Command="{Binding ClearFolderCommand}"
+                      IsVisible="{Binding HasAutoSaveFolder}"
+                      ToolTip.Tip="Stop auto-saving"
+                      Padding="8,7">
+                <Image Source="avares://XBVault/Assets/Icons/close-20.png"
+                       Width="18" Height="18" Stretch="Uniform"/>
+              </Button>
+            </StackPanel>
+            <TextBlock Grid.Column="3"
                        IsVisible="{Binding IsCapturing}"
                        Text="Capturing..."
                        FontSize="13" Foreground="{StaticResource TextMutedBrush}"
                        VerticalAlignment="Center"/>
 
             <!-- Live capture controls -->
-            <ComboBox Grid.Column="3"
+            <ComboBox Grid.Column="4"
                       VerticalAlignment="Center"
                       ItemsSource="{Binding IntervalOptions}"
                       SelectedItem="{Binding SelectedInterval}"
                       IsEnabled="{Binding IsLiveCapturing, Converter={StaticResource BoolInverse}}"
                       Width="80"/>
 
-            <TextBlock Grid.Column="4" Text="● LIVE"
+            <TextBlock Grid.Column="5" Text="● LIVE"
                        Foreground="#E74C3C" FontSize="13" FontWeight="Bold"
                        VerticalAlignment="Center"
                        IsVisible="{Binding IsLiveCapturing}"/>
 
-            <Button Grid.Column="5"
+            <Button Grid.Column="6"
                     Command="{Binding ToggleLiveCaptureCommand}"
                     Padding="12,7" FontWeight="SemiBold">
               <ToolTip.Tip>
